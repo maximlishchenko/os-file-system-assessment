@@ -12,13 +12,12 @@
 #define FALSE 0
 #endif
 
-#define MAXMEM 1024;
-
 /*Convenience definitions*/
 typedef uint32_t _u32; 
 typedef unsigned char Byte;
 
-/*An inode contains the size (in bytes) of the content, 5 directly referenced blocks, 1 single indirectly referenced block, and 1 doubly indirectly referenced block.*/
+/*An inode contains the size (in bytes) of the content, 5 directly referenced blocks, 
+1 single indirectly referenced block, and 1 doubly indirectly referenced block.*/
 typedef struct inode {
     _u32 size;
     _u32 blocks[7];
@@ -33,11 +32,25 @@ typedef struct rootblock {
 
 extern rootblock_t * rootblock;
 
-typedef struct block {
-    
+typedef struct bitmapblock {
+
+} bitmapblock_t;
+
+typedef struct datablock {
+
+} datablock_t;
+
+typedef union block {
+    rootblock_t rootblock;
+	bitmapblock_t bitmapblock;
+	inode_t inodeblock;
+    datablock_t datablock;
 } block_t;
 
-/*A directory entry consists of an index to the inode for the entry. The next Byte records whether it is a file ('F') or directory ('D'). Following this, we record the number of characters in the entry name, and a pointer to a null terminated string containing the name.*/
+/*A directory entry consists of an index to the inode for the entry. 
+The next Byte records whether it is a file ('F') or directory ('D'). 
+Following this, we record the number of characters in the entry name, 
+and a pointer to a null terminated string containing the name.*/
 typedef struct direntry {
     _u32 inode_num;
     Byte type;
@@ -52,7 +65,10 @@ typedef struct directory {
 } directory_t;
 
 
-/*The my_file structure is used internally when a program opens a file. It records the index of the inode associated with the file and - to prevent repeatedly reading it from disk - also has the inode itself. pos records the current position in the file. The buffer entry is a block size sized buffer containing the current block the file is looking at. */
+/*The my_file structure is used internally when a program opens a file. It records 
+the index of the inode associated with the file and - to prevent repeatedly reading 
+it from disk - also has the inode itself. pos records the current position in the file. 
+The buffer entry is a block size sized buffer containing the current block the file is looking at. */
 typedef struct my_file {
     _u32 inode_num;
     _u32 pos;
@@ -62,14 +78,17 @@ typedef struct my_file {
 /**************** PRIMITIVE ACCESS OPERATIONS ********************/
 /*Read a disk block from index, writing it to buffer. Returns 0 on success, a negative number on error.*/
 int read_block(_u32 index, Byte *buffer);
-/*Write a disk block, filling it with content at index. content should be the same size as the block size. Returns 0 on success, a negative number on error*/
+/*Write a disk block, filling it with content at index. content should be the same size as 
+the block size. Returns 0 on success, a negative number on error*/
 int write_block(_u32 index, Byte *content);
 
 /**************** INITIALIZATION OPERATIONS *********************/
-/*Formats the disk creating appropriate root blocks, free bitmap blocks, inode blocks and root directory. returns 0 on success, a negative number on error*/
+/*Formats the disk creating appropriate root blocks, free bitmap blocks, inode blocks and root directory. 
+returns 0 on success, a negative number on error*/
 int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes);
 
-/*Loads a filesystem which has already been formatted. The write_buffer_size records how many blocks must change before they are written back to the disk. Returns 0 on success.*/
+/*Loads a filesystem which has already been formatted. The write_buffer_size records how many 
+blocks must change before they are written back to the disk. Returns 0 on success.*/
 int load(char *diskname, _u32 write_buffer_size);
 
 /*returns the rootblock*/
@@ -84,15 +103,24 @@ _u32 num_free_inodes();
 /*Unloads the loaded file system. Returns 0 on success.*/
 int unload(void);
 
-/*This function writes all blocks that need to  be written back to the disk (see the load function's write_buffer_size for detals)*/
+/*This function writes all blocks that need to  be written back 
+to the disk (see the load function's write_buffer_size for detals)*/
 // void fsync(void);
 
 /**************** DIRECTORY OPERATIONS *********************/
-/* Makes a directory. name is either a full path (if it begins with '/', or a relative path with regards to the current location in the file system. All entries except the last must already exist. Returns 0 on success.*/
+/* Makes a directory. name is either a full path (if it begins with '/', or 
+a relative path with regards to the current location in the file system. 
+All entries except the last must already exist. Returns 0 on success.*/
 int mkdir(char *name);
-/* Removes a directory. name is either a full path (if it begins with '/', or a relative path with regards to the current location in the file system. All entries except the last must already exist. If recursive is true, then all entries below the removed directory are also removed. If false and the directory is not empty, return an error. Returns 0 on success.*/
+/* Removes a directory. name is either a full path (if it begins with '/', 
+or a relative path with regards to the current location in the file system. 
+All entries except the last must already exist. If recursive is true, then 
+all entries below the removed directory are also removed. If false and the 
+directory is not empty, return an error. Returns 0 on success.*/
 // int rmdir(char *name,char recursive);
-/* Sets the current working directory. name is either a full path (if it begins with '/', or a relative path with regards to the current location in the file system. All entries must already exist. Returns 0 on success.*/
+/* Sets the current working directory. name is either a full path 
+(if it begins with '/', or a relative path with regards to the current 
+location in the file system. All entries must already exist. Returns 0 on success.*/
 // int chdir(char *name);
 /* Returns the full path to the current directory*/
 char *cwd(void);
