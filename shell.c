@@ -7,6 +7,8 @@
 
 int main()
 {
-  // test();
   load("E3Sample.disk", 0);
+  // test();
+  get_rootblock();
+  printf(("num_free_blocks = %d\n"), num_free_blocks());
 }
