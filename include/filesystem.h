@@ -30,8 +30,6 @@ typedef struct rootblock {
     _u32 num_inode_table_blocks;
 } rootblock_t;
 
-extern rootblock_t * rootblock;
-
 /*A directory entry consists of an index to the inode for the entry. 
 The next Byte records whether it is a file ('F') or directory ('D'). 
 Following this, we record the number of characters in the entry name, 

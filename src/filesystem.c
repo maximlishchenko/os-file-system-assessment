@@ -6,16 +6,6 @@
 
 FILE * fp = NULL;
 
-typedef struct {
-    _u32 inode_num;
-    Byte type;
-    Byte name_length;
-} direntry_base;
-
-typedef struct {
-    _u32 num_entries;
-} directory_base;
-
 /*Loads a filesystem which has already been formatted. The write_buffer_size records 
 how many blocks must change before they are written back to the disk. Returns 0 on success.*/
 int load(char *diskname, _u32 write_buffer_size) {
@@ -24,51 +14,41 @@ int load(char *diskname, _u32 write_buffer_size) {
     return -1;
   }
   fseek(fp, 0, SEEK_SET);
-  // _u32 buffer[4];
-  // if (fread(buffer, sizeof(_u32), 4, fp) < 0) {
-  //   return -1;
-  // }
-  // rootblock_t * rootblock = malloc(sizeof(_u32) * 4);
-  // rootblock->block_size = buffer[0];
-  // rootblock->num_blocks = buffer[1];
-  // rootblock->num_free_bitmap_blocks = buffer[2];
-  // rootblock->num_inode_table_blocks = buffer[3];
   return 0;
 }
 
-/*returns the rootblock or -1 on failure*/
+/*Returns the rootblock or NULL on failure*/
 rootblock_t * get_rootblock() {
   if (fp == NULL) {
     return NULL;
   }
   fseek(fp, 0, SEEK_SET);
-  rootblock_t * rootblock = malloc(sizeof(rootblock_t));
+  rootblock_t * rb = malloc(sizeof(rootblock_t));
   _u32 buffer[4];
   if (fread(buffer, sizeof(_u32), 4, fp) < 0) {
     return NULL;
   }
-  rootblock->block_size = buffer[0];
-  rootblock->num_blocks = buffer[1];
-  rootblock->num_free_bitmap_blocks = buffer[2];
-  rootblock->num_inode_table_blocks = buffer[3];
-  return rootblock;
+  rb->block_size = buffer[0];
+  rb->num_blocks = buffer[1];
+  rb->num_free_bitmap_blocks = buffer[2];
+  rb->num_inode_table_blocks = buffer[3];
+  return rb;
 }
 
 /*Read a disk block from index, writing it to buffer. 
 Returns 0 on success, a negative number on error.*/
 int read_block(_u32 index, Byte *buffer) {
   rootblock_t * rb = get_rootblock();
-  // Rootblock doesn't exist
   if (rb == NULL) {
     return -1;
   }
-  // Out of bounds
   if (index >= rb->num_blocks) {
     free(rb);
     return -1;
   }
   fseek(fp, index * rb->block_size, SEEK_SET);
-  if (fread(buffer, rb->block_size, 1, fp) < 0) {
+  // Read full block
+  if (fread(buffer, sizeof(Byte), rb->block_size, fp) < 0) {
     free(rb);
     return -1;
   }
@@ -76,6 +56,8 @@ int read_block(_u32 index, Byte *buffer) {
   return 0;
 }
 
+/*Write a disk block, filling it with content at index. content should be 
+the same size as the block size. Returns 0 on success, a negative number on error*/
 int write_block(_u32 index, Byte *content) {
   rootblock_t * rb = get_rootblock();
   if (rb == NULL) {
@@ -87,7 +69,7 @@ int write_block(_u32 index, Byte *content) {
   }
   fseek(fp, index * rb->block_size, SEEK_SET);
   // Write full block
-  if (fwrite(content, rb->block_size, 1, fp) < 0) {
+  if (fwrite(content, sizeof(Byte), rb->block_size, fp) < 0) {
     free(rb);
     return -1;
   }
@@ -95,17 +77,20 @@ int write_block(_u32 index, Byte *content) {
   return 0;
 }
 
+/*Returns the number of free blocks on the disk or -1 on failure.*/
 _u32 num_free_blocks() {
   rootblock_t * rb = get_rootblock();
   if (rb == NULL) {
     return -1;
   }
-  int free_blocks = rb->num_blocks;
+  _u32 free_blocks = rb->num_blocks;
+  // Iterate through free bitmap blocks
   for (int i = 1; i < (rb->num_free_bitmap_blocks + 1); i++) {
     Byte buffer[rb->block_size];
     if (read_block(i, buffer) < 0) {
       return -1;
     }
+    // Iterate through each byte of a single block
     for (int j = 0; j < rb->block_size; j++) {
       if (buffer[j] != 0) {
         free_blocks -= get_positive_bits(buffer[j]);
@@ -116,32 +101,42 @@ _u32 num_free_blocks() {
   return free_blocks;
 }
 
+/*Returns the number of free inodes on the disk or -1 on failure.*/
 _u32 num_free_inodes() {
   rootblock_t * rb = get_rootblock();
   if (rb == NULL) {
     return -1;
   }
-  int free_inodes = rb->num_inode_table_blocks * (rb->block_size / 32);
-  for (int i = rb->num_free_bitmap_blocks + 1; i < rb->num_free_bitmap_blocks + 1 + rb->num_inode_table_blocks; i++) {
+  _u32 free_inodes = rb->num_inode_table_blocks * (rb->block_size / 32);
+  // Iterate through inode blocks
+  for (int i = rb->num_free_bitmap_blocks + 1; i < (1 + rb->num_free_bitmap_blocks + rb->num_inode_table_blocks); i++) {
     Byte buffer[rb->block_size];
+    int num_inodes_per_block = free_inodes / rb->num_inode_table_blocks;
+    // Read num_inodes_per_block inodes into buffer
     if (read_block(i, buffer) < 0) {
       return -1;
     }
-    int flag = 1;
-    for (int j = 0; j < rb->block_size; j = j + 32) {
-      if (buffer[j] != 0) {
-        flag = 0;
-        break;
+    // Iterate through each inode in current block
+    for (int j = 0; j < num_inodes_per_block; j++) {
+      // flag = 1 means inode is free, 0 occupied
+      int flag = 1;
+      // Check all entries of each inode
+      for (int k = 0; k < sizeof(inode_t); k++) {
+        if (buffer[j*sizeof(inode_t)+k] != 0) {
+          flag = 0;
+          break;
+        }
       }
-    }
-    if (flag != 1) {
-      free_inodes -= 1;
+      if (flag != 1) {
+        free_inodes -= 1;
+      }
     }
   }
   free(rb);
   return free_inodes;
 }
 
+/*Unloads the loaded file system. Returns 0 on success.*/
 int unload(void) {
   if (fp == NULL) {
     return -1;
@@ -312,10 +307,8 @@ int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes) {
   return 0;
 }
 
-int test() {
-
-}
-
+/*Given a decimal number 0 <= b <= 255, calculate the 
+number of 1's if this number is converted to binary.*/
 int get_positive_bits(Byte b) {
   int result = 0;
   for (int i = 0; i < 8; i++) {
@@ -324,4 +317,8 @@ int get_positive_bits(Byte b) {
     }
   }
   return result;
+}
+
+int test() {
+  printf("%d\n", get_positive_bits(123));
 }
