@@ -30,6 +30,6 @@ int main()
     //load("D3.disk");
     //char *dir=ls("/");
     //return strcmp(dir,".\n..\n");
-
+    printf("D3 PASS\n");
     return 0;
 }

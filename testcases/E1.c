@@ -20,10 +20,10 @@ int main()
 
     if (fb!=4070)
         return -1;
-
+    
     if (fi!=79)
         return -1;
-    printf("pass\n");
+    printf("E1 PASS\n");
     return 0;
 }
 
