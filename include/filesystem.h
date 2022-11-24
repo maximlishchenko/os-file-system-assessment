@@ -142,7 +142,7 @@ int unlock(char *file);
 /*************** FILE SYSTEM VERIFICATION FUNCTIONS***********/
 int fsck(void);
 
-//own helper FUNCTIONS
+//own helper functions
 int get_positive_bits(Byte b);
 
 #endif

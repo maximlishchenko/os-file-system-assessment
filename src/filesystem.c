@@ -147,15 +147,182 @@ int unload(void) {
   return 0;
 }
 
+/* Returns a sorted list of directory entries as a string separated by \n*/
+char *ls(void) {
+
+}
+
+/*Formats the disk creating appropriate root blocks, free bitmap blocks, 
+inode blocks and root directory. returns 0 on success, a negative number on error*/
+// int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes) {
+//   if (block_size < sizeof(rootblock_t)) {
+//     return -1;
+//   }
+//   fp = fopen(diskname, "wb");
+//   if (fp == NULL) {
+//     return -1;
+//   }
+//   rootblock_t * rb = malloc(sizeof(rootblock_t));
+//   rb->block_size = block_size;
+//   rb->num_blocks = num_blocks;
+//   rb->num_free_bitmap_blocks = num_blocks / block_size / 8;
+//   rb->num_inode_table_blocks = num_inodes / (block_size / sizeof(inode_t));
+//   // Write rootblock to disk
+//   if (fwrite(rb, sizeof(rootblock_t), 1, fp) < 0) {
+//     return -1;
+//   }
+
+//   Byte buffer[rb->block_size - sizeof(rootblock_t)];
+//   for (int i = 0; i < rb->block_size - sizeof(rootblock_t); i++) {
+//     buffer[i] = 0;
+//   }
+
+//   // Fill the rest of rootblock with 0's
+//   if (fwrite(buffer, rb->block_size - sizeof(rootblock_t), 1, fp) < 0) {
+//     return -1;
+//   }
+
+//   // Free bitmap block information
+//   int num_occupied_blocks = rb->num_free_bitmap_blocks + rb->num_inode_table_blocks + 2; // 1 for rootblock, 1 for root dir
+//   int num_8_bit_blocks = 0;
+//   Byte bitmap_buffer[rb->num_free_bitmap_blocks * block_size];
+//   for (int i = 7; i < num_occupied_blocks; i = i + 8) {
+//     num_8_bit_blocks += 1;
+//   }
+//   if (num_8_bit_blocks != 0) {
+//     for (int i = 0; i < num_8_bit_blocks; i++) {
+//       bitmap_buffer[i] = 255;
+//     }
+//   }
+//   if (num_occupied_blocks % 8 != 0) {
+//     int result = 2;
+//     for (int i = 1; i <= num_occupied_blocks % 8; i++) {
+//       result = i * result;
+//     }
+//     result -= 1;
+//     bitmap_buffer[num_8_bit_blocks] = result;
+//   }
+//   for (int i = num_8_bit_blocks + 1; i < rb->num_free_bitmap_blocks * block_size; i++) {
+//     bitmap_buffer[i] = 0;
+//   }
+//   // Write the bitmap blocks
+//   if (fwrite(bitmap_buffer, rb->num_free_bitmap_blocks * block_size, 1, fp) < 0) {
+//     return -1;
+//   }
+
+//   // inode blocks information
+//   inode_t * root_dir_inode = malloc(sizeof(inode_t));
+//   if (root_dir_inode == NULL) {
+//     return -1;
+//   }
+//   root_dir_inode->size = 21;
+//   root_dir_inode->blocks[0] = 1 + rb->num_free_bitmap_blocks + rb->num_inode_table_blocks;
+//   for (int i = 1; i < 8; i++) {
+//     root_dir_inode->blocks[i] = 0;
+//   }
+//   // write the root inode
+//   if (fwrite(root_dir_inode, sizeof(inode_t), 1, fp) < 0) {
+//     return -1;
+//   };
+//   free(root_dir_inode);
+
+//   // write rest of the inodes
+//   for (int i = 1; i < num_inodes; i++) {
+//     inode_t * empty_inode = malloc(sizeof(inode_t));
+//     if (empty_inode == NULL) {
+//       return -1;
+//     }
+//     empty_inode->size = 0;
+//     for (int i = 0; i < 8; i++) {
+//       root_dir_inode->blocks[i] = 0;
+//     }
+//     if (fwrite(empty_inode, sizeof(inode_t), 1, fp) < 0) {
+//       return -1;
+//     };
+//     free(empty_inode);
+//   }
+
+//   // directory and direntry information
+//   direntry_t curr_dir;
+//   curr_dir.inode_num = 0; // 4
+//   curr_dir.type = 'D'; // 1
+//   curr_dir.name_length = 2; // 1
+//   // char curr_dir_name[2] = {'.', '\0'}; // 2
+//   // curr_dir.name = curr_dir_name;
+//   curr_dir.name = ".\0";
+
+//   direntry_t parent_dir;
+//   parent_dir.inode_num = 0; // 4
+//   parent_dir.type = 'D'; // 1
+//   parent_dir.name_length = 3; // 1
+//   // char parent_dir_name[3] = {'.', '.', '\0'}; // 3
+//   // parent_dir.name = parent_dir_name;
+//   parent_dir.name = "..\0";
+  
+
+//   direntry_t direntry_array[2];
+//   direntry_array[0] = curr_dir;
+//   direntry_array[1] = parent_dir;
+
+//   directory_t root_dir;
+//   root_dir.num_entries = 2; // 4
+//   root_dir.dir_entries = direntry_array;
+
+//   _u32 u32_temp[1];
+//   u32_temp[0] = root_dir.num_entries;
+//   if (fwrite(u32_temp, sizeof(_u32), 1, fp) < 0) {
+//     return -1;
+//   }
+//   for (int i = 0; i < root_dir.num_entries; i++) {
+//     _u32 u32_temp[1];
+//     u32_temp[0] = root_dir.dir_entries[i].inode_num;
+//     if (fwrite(u32_temp, sizeof(_u32), 1, fp) < 0) {
+//       return -1;
+//     }
+//     Byte byte_temp[2];
+//     byte_temp[0] = root_dir.dir_entries[i].type;
+//     byte_temp[1] = root_dir.dir_entries[i].name_length;
+//     if (fwrite(byte_temp, 2, 1, fp) < 0) {
+//       return -1;
+//     }
+//     int buffer_length = (int)root_dir.dir_entries[i].name_length; // 1 for type, 1 for name_length
+//     if (fwrite(root_dir.dir_entries[i].name, buffer_length, 1, fp) < 0) {
+//       return -1;
+//     }
+//   }
+
+//   // Fill rest with 0's
+//   Byte zero_buffer[rb->block_size - 21];
+//   for (int i = 0; i < rb->block_size - 21; i++) {
+//     zero_buffer[i] = 0;
+//   }
+//   if (fwrite(zero_buffer, rb->block_size - 21, 1, fp) < 0) {
+//     return -1;
+//   }
+//   for (int i = 2 + rb->num_free_bitmap_blocks + rb->num_inode_table_blocks; i < rb->num_blocks; i++) {
+//     Byte zero_buffer[rb->block_size];
+//     for (int i = 0; i < rb->block_size; i++) {
+//       zero_buffer[i] = 0;
+//     }
+//     if (fwrite(zero_buffer, rb->block_size, 1, fp) < 0) {
+//       return -1;
+//     }
+//   }
+//   free(rb);
+//   fclose(fp);
+//   return 0;
+// }
+
 int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes) {
+  // Rootblock doesn't fit into block
   if (block_size < sizeof(rootblock_t)) {
     return -1;
   }
-
   fp = fopen(diskname, "wb");
   if (fp == NULL) {
     return -1;
   }
+  // Create rootblock
   rootblock_t * rb = malloc(sizeof(rootblock_t));
   rb->block_size = block_size;
   rb->num_blocks = num_blocks;
@@ -165,95 +332,85 @@ int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes) {
   if (fwrite(rb, sizeof(rootblock_t), 1, fp) < 0) {
     return -1;
   }
-
-  Byte buffer[rb->block_size - sizeof(rootblock_t)];
-  for (int i = 0; i < rb->block_size - sizeof(rootblock_t); i++) {
-    buffer[i] = 0;
+  // Create buffer that will hold trailing zeros for rootblock
+  Byte zero_buffer[block_size - sizeof(rootblock_t)];
+  // Allocate 0's
+  for (int i = 0; i < block_size - sizeof(rootblock_t); i++) {
+    zero_buffer[i] = 0;
   }
-
-  // Fill the rest of rootblock with 0's
-  if (fwrite(buffer, rb->block_size - sizeof(rootblock_t), 1, fp) < 0) {
+  // Write trailing zeros to rootblock
+  if (fwrite(zero_buffer, sizeof(Byte), block_size - sizeof(rootblock_t), fp) < 0) {
+    return -1;
+  }
+  fclose(fp);
+  fp = fopen(diskname, "ab+");
+  if (fp == NULL) {
     return -1;
   }
 
-  // Free bitmap block information
-  int num_occupied_blocks = rb->num_free_bitmap_blocks + rb->num_inode_table_blocks + 2; // 1 for rootblock, 1 for root dir
-  int num_8_bit_blocks = 0;
-  Byte bitmap_buffer[rb->num_free_bitmap_blocks * block_size];
+  // Number of occupied blocks on disk
+  _u32 num_occupied_blocks = 1 + rb->num_free_bitmap_blocks + rb->num_inode_table_blocks + 1; // + 1 for rootblock, + 1 for root dir
+  // Calculate the number of 8 positive-bit (FF) bytes
+  _u32 num_8_bit_blocks = 0;
   for (int i = 7; i < num_occupied_blocks; i = i + 8) {
     num_8_bit_blocks += 1;
   }
-  if (num_8_bit_blocks != 0) {
-    for (int i = 0; i < num_8_bit_blocks; i++) {
-      bitmap_buffer[i] = 255;
+  _u32 num_occupied_bitmap_blocks = 0; // number of bitmap blocks with at least 1 non-zero entry
+  int num_bits_per_block = block_size * 8; // number of bits per block
+  int current;
+  for (int i = 0; i < rb->num_free_bitmap_blocks; i++) {
+    current = i * num_bits_per_block;
+    if (num_8_bit_blocks > current) {
+      num_occupied_bitmap_blocks++;
     }
   }
-  if (num_occupied_blocks % 8 != 0) {
-    int result = 2;
-    for (int i = 1; i <= num_occupied_blocks % 8; i++) {
-      result = i * result;
+  // First dealing with non-empty bitmap blocks
+  for (int i = 0; i < num_occupied_bitmap_blocks; i++) {
+    Byte buffer[block_size];
+    for (int j = 0; j < num_8_bit_blocks && j < block_size; j++) {
+      buffer[j] = 255;
     }
-    result -= 1;
-    bitmap_buffer[num_8_bit_blocks] = result;
-  }
-  for (int i = num_8_bit_blocks + 1; i < rb->num_free_bitmap_blocks * block_size; i++) {
-    bitmap_buffer[i] = 0;
-  }
-  // Write the bitmap blocks
-  if (fwrite(bitmap_buffer, rb->num_free_bitmap_blocks * block_size, 1, fp) < 0) {
-    return -1;
-  }
-
-  // inode blocks information
-  inode_t * root_dir_inode = malloc(sizeof(inode_t));
-  if (root_dir_inode == NULL) {
-    return -1;
-  }
-  root_dir_inode->size = 21;
-  root_dir_inode->blocks[0] = 1 + rb->num_free_bitmap_blocks + rb->num_inode_table_blocks;
-  for (int i = 1; i < 8; i++) {
-    root_dir_inode->blocks[i] = 0;
-  }
-  // write the root inode
-  if (fwrite(root_dir_inode, sizeof(inode_t), 1, fp) < 0) {
-    return -1;
-  };
-  free(root_dir_inode);
-
-  // write rest of the inodes
-  for (int i = 1; i < num_inodes; i++) {
-    inode_t * empty_inode = malloc(sizeof(inode_t));
-    if (empty_inode == NULL) {
+    if (num_occupied_blocks % 8 != 0) {
+      int result = 2;
+      for (int k = 1; k <= num_occupied_blocks % 8; k++) {
+        result = k * result;
+      }
+      result -= 1;
+      buffer[num_8_bit_blocks] = result;
+    }
+    for (int j = num_8_bit_blocks + 1; j < block_size; j++) {
+      buffer[j] = 0;
+    }
+    if (write_block(i + 1, buffer) < 0) {
       return -1;
     }
-    empty_inode->size = 0;
-    for (int i = 0; i < 8; i++) {
-      root_dir_inode->blocks[i] = 0;
+  }
+  int fully_free_blocks = rb->num_free_bitmap_blocks - num_occupied_bitmap_blocks;
+  // Write the remaining free bitmap blocks
+  for (int i = 0; i < fully_free_blocks; i++) {
+    Byte buffer[block_size];
+    for (int j = 0; j < block_size; j++) {
+      buffer[j] = 0;
     }
-    if (fwrite(empty_inode, sizeof(inode_t), 1, fp) < 0) {
+    if (write_block(i + 1 + num_occupied_bitmap_blocks, buffer) < 0) {
       return -1;
-    };
-    free(empty_inode);
+    }
   }
 
-  // directory and direntry information
+
+  // Initializing root directory and '.' with '..'
   direntry_t curr_dir;
   curr_dir.inode_num = 0; // 4
   curr_dir.type = 'D'; // 1
   curr_dir.name_length = 2; // 1
-  // char curr_dir_name[2] = {'.', '\0'}; // 2
-  // curr_dir.name = curr_dir_name;
   curr_dir.name = ".\0";
 
   direntry_t parent_dir;
   parent_dir.inode_num = 0; // 4
   parent_dir.type = 'D'; // 1
   parent_dir.name_length = 3; // 1
-  // char parent_dir_name[3] = {'.', '.', '\0'}; // 3
-  // parent_dir.name = parent_dir_name;
   parent_dir.name = "..\0";
   
-
   direntry_t direntry_array[2];
   direntry_array[0] = curr_dir;
   direntry_array[1] = parent_dir;
@@ -262,46 +419,39 @@ int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes) {
   root_dir.num_entries = 2; // 4
   root_dir.dir_entries = direntry_array;
 
-  _u32 u32_temp[1];
-  u32_temp[0] = root_dir.num_entries;
-  if (fwrite(u32_temp, sizeof(_u32), 1, fp) < 0) {
-    return -1;
-  }
+  int total_name_len = 0;
   for (int i = 0; i < root_dir.num_entries; i++) {
-    _u32 u32_temp[1];
-    u32_temp[0] = root_dir.dir_entries[i].inode_num;
-    if (fwrite(u32_temp, sizeof(_u32), 1, fp) < 0) {
-      return -1;
-    }
-    Byte byte_temp[2];
-    byte_temp[0] = root_dir.dir_entries[i].type;
-    byte_temp[1] = root_dir.dir_entries[i].name_length;
-    if (fwrite(byte_temp, 2, 1, fp) < 0) {
-      return -1;
-    }
-    int buffer_length = (int)root_dir.dir_entries[i].name_length; // 1 for type, 1 for name_length
-    if (fwrite(root_dir.dir_entries[i].name, buffer_length, 1, fp) < 0) {
-      return -1;
-    }
+    total_name_len += strlen(root_dir.dir_entries[i].name) + 1;
+  }
+  int root_dir_length = root_dir.num_entries * 6 + 4 + total_name_len;
+  Byte * result_buffer = malloc(block_size);
+
+  _u32 num_entries_buffer[1];
+  num_entries_buffer[0] = root_dir.num_entries;
+  memcpy(result_buffer, num_entries_buffer, sizeof(_u32));
+  int current_offset = sizeof(_u32);
+  for (int i = 0; i < root_dir.num_entries; i++) {
+    _u32 u32_buffer[1]; // stores inode_num
+    u32_buffer[0] = root_dir.dir_entries[i].inode_num;
+    Byte byte_buffer[2]; // stores type and name_length
+    byte_buffer[0] = root_dir.dir_entries[i].type;
+    byte_buffer[1] = root_dir.dir_entries[i].name_length;
+    memcpy(result_buffer + current_offset, u32_buffer, sizeof(_u32));
+    current_offset += sizeof(_u32);
+    memcpy(result_buffer + current_offset, byte_buffer, 2 * sizeof(Byte));
+    current_offset += 2 * sizeof(Byte);
+    memcpy(result_buffer + current_offset, root_dir.dir_entries[i].name, strlen(root_dir.dir_entries[i].name) + 1);
+    current_offset += strlen(root_dir.dir_entries[i].name) + 1;
+  }
+  Byte remainder_buffer[block_size-root_dir_length];
+  for (int i = 0; i < block_size-root_dir_length; i++) {
+    remainder_buffer[i] = 0;
+  }
+  memcpy(result_buffer + current_offset, remainder_buffer, block_size-root_dir_length);
+  if (write_block(1 + rb->num_free_bitmap_blocks, result_buffer) < 0) {
+    return -1;
   }
 
-  // Fill rest with 0's
-  Byte zero_buffer[rb->block_size - 21];
-  for (int i = 0; i < rb->block_size - 21; i++) {
-    zero_buffer[i] = 0;
-  }
-  if (fwrite(zero_buffer, rb->block_size - 21, 1, fp) < 0) {
-    return -1;
-  }
-  for (int i = 2 + rb->num_free_bitmap_blocks + rb->num_inode_table_blocks; i < rb->num_blocks; i++) {
-    Byte zero_buffer[rb->block_size];
-    for (int i = 0; i < rb->block_size; i++) {
-      zero_buffer[i] = 0;
-    }
-    if (fwrite(zero_buffer, rb->block_size, 1, fp) < 0) {
-      return -1;
-    }
-  }
   free(rb);
   fclose(fp);
   return 0;
@@ -320,5 +470,5 @@ int get_positive_bits(Byte b) {
 }
 
 int test() {
-  printf("%d\n", get_positive_bits(123));
+
 }
