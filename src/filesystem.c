@@ -397,7 +397,6 @@ int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes) {
     }
   }
 
-
   // Initializing root directory and '.' with '..'
   direntry_t curr_dir;
   curr_dir.inode_num = 0; // 4
@@ -410,7 +409,7 @@ int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes) {
   parent_dir.type = 'D'; // 1
   parent_dir.name_length = 3; // 1
   parent_dir.name = "..\0";
-  
+
   direntry_t direntry_array[2];
   direntry_array[0] = curr_dir;
   direntry_array[1] = parent_dir;
@@ -424,6 +423,63 @@ int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes) {
     total_name_len += strlen(root_dir.dir_entries[i].name) + 1;
   }
   int root_dir_length = root_dir.num_entries * 6 + 4 + total_name_len;
+
+  // Creating root directory inode
+  inode_t * root_dir_inode = malloc(sizeof(inode_t));
+  if (root_dir_inode == NULL) {
+    return -1;
+  }
+  root_dir_inode->size = root_dir_length;
+  root_dir_inode->blocks[0] = 1 + rb->num_free_bitmap_blocks + rb->num_inode_table_blocks;
+  for (int i = 1; i < 7; i++) {
+    root_dir_inode->blocks[i] = 0;
+  }
+  // Buffer to be written to disk
+  Byte * root_dir_inode_buffer = malloc(block_size);
+  memcpy(root_dir_inode_buffer, root_dir_inode, sizeof(inode_t));
+  int offset = sizeof(inode_t);
+  // Creating remaining empty inodes for the first inode block
+  for (int i = 0; i < (block_size / sizeof(inode_t)) - 1; i++) {
+    inode_t * empty_inode = malloc(sizeof(inode_t));
+    if (empty_inode == NULL) {
+      return -1;
+    }
+    empty_inode->size = 0;
+    for (int j = 0; j < 7; j++) {
+      empty_inode->blocks[j] = 0;
+    }
+    memcpy(root_dir_inode_buffer + offset, empty_inode, sizeof(inode_t));
+    free(empty_inode);
+    offset += sizeof(inode_t);
+  }
+  // Write the first inode block
+  if (write_block(1 + rb->num_free_bitmap_blocks, root_dir_inode_buffer) < 0) {
+    return -1;
+  }
+  free(root_dir_inode);
+
+  // Creating remaining empty inodes for the rest of the blocks
+  for (int i = 1; i < rb->num_inode_table_blocks; i++) {
+    Byte * empty_inode_buffer = malloc(block_size);
+    int offset = 0;
+    for (int j = 0; j < (block_size / sizeof(inode_t)); j++) {
+      inode_t * empty_inode = malloc(sizeof(inode_t));
+      if (empty_inode == NULL) {
+        return -1;
+      }
+      empty_inode->size = 0;
+      for (int k = 0; k < 7; k++) {
+        empty_inode->blocks[k] = 0;
+      }
+      memcpy(empty_inode_buffer + offset, empty_inode, sizeof(inode_t));
+      free(empty_inode);
+      offset += sizeof(inode_t);
+    }
+    if (write_block(1 + rb->num_free_bitmap_blocks + i, empty_inode_buffer) < 0) {
+      return -1;
+    }
+  }
+
   Byte * result_buffer = malloc(block_size);
 
   _u32 num_entries_buffer[1];
@@ -448,8 +504,19 @@ int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes) {
     remainder_buffer[i] = 0;
   }
   memcpy(result_buffer + current_offset, remainder_buffer, block_size-root_dir_length);
-  if (write_block(1 + rb->num_free_bitmap_blocks, result_buffer) < 0) {
+  if (write_block(1 + rb->num_free_bitmap_blocks + rb->num_inode_table_blocks, result_buffer) < 0) {
     return -1;
+  }
+
+  // Creating remaining empty blocks
+  for (int i = 1 + rb->num_free_bitmap_blocks + rb->num_inode_table_blocks + 1; i < num_blocks; i++) {
+    Byte buffer[block_size];
+    for (int j = 0; j < block_size; j++) {
+      buffer[j] = 0;
+    }
+    if (write_block(i, buffer) < 0) {
+      return -1;
+    }
   }
 
   free(rb);
