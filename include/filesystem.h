@@ -97,7 +97,7 @@ int unload(void);
 /* Makes a directory. name is either a full path (if it begins with '/', 
 or a relative path with regards to the current location in the file system. 
 All entries except the last must already exist. Returns 0 on success.*/
-// int mkdir(char *name);
+int mkdir(char *name);
 /* Removes a directory. name is either a full path (if it begins with '/', 
 or a relative path with regards to the current location in the file system. 
 All entries except the last must already exist. If recursive is true, then 

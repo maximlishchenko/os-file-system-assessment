@@ -26,6 +26,7 @@ rootblock_t * get_rootblock() {
   rootblock_t * rb = malloc(sizeof(rootblock_t));
   _u32 buffer[4];
   if (fread(buffer, sizeof(_u32), 4, fp) < 0) {
+    free(rb);
     return NULL;
   }
   rb->block_size = buffer[0];
@@ -360,8 +361,13 @@ int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes) {
   return 0;
 }
 
-/* Opens a file for reading and writing. returns NULL on error. 
-filename is an absolute or relative path to a file.*/
+/* Makes a directory. name is either a full path (if it begins with '/', 
+or a relative path with regards to the current location in the file system. 
+All entries except the last must already exist. Returns 0 on success.*/
+int mkdir(char *name) {
+
+}
+
 // typedef struct my_file {
 //     _u32 inode_num;
 //     inode_t *inode;
@@ -369,8 +375,19 @@ filename is an absolute or relative path to a file.*/
 //     Byte *buffer;
 //     char dirty;
 // } my_file;
+/* Opens a file for reading and writing. returns NULL on error. 
+filename is an absolute or relative path to a file.*/
 my_file *my_fopen(char *filename) {
-  my_file * file;
+  // Read directory we want to create the file in
+
+  int index;
+
+  // Create a new directory entry for the file we are creating
+  // Set all attributes of the new direntry accoridingly
+  // Change the directory’s inode’s size element
+  // Add new direntry to list of direntries of the directory
+  // Write directory back to disk
+  // Create my_file struct, set all attributes accordingly and return it
 }
 
 
@@ -380,7 +397,7 @@ my_file *my_fopen(char *filename) {
 // } inode_t;
 
 // Gets index of the first free inode or -1 on error.
-_u32 read_inode() {
+_u32 get_first_free_inode() {
   rootblock_t * rb = get_rootblock();
   if (rb == NULL) {
     return -1;
@@ -393,9 +410,8 @@ _u32 read_inode() {
     }
     // Read each inode
     for (int j = 0; j < rb->block_size / sizeof(inode_t); j++) {
-      // printf("j is %d\n", j);
       int flag = 1; // 1 means free, 0 occupied
-      // Read each _u32
+      // Read each Byte
       for (int k = j * sizeof(inode_t); k < j * sizeof(inode_t) + sizeof(inode_t); k++) {
         if (buffer[k] != 0) {
           flag = 0;
@@ -413,6 +429,25 @@ _u32 read_inode() {
   return -1;
 }
 
+// Reads inode at index into buffer
+int read_inode(_u32 index, _u32 *buffer) {
+  rootblock_t * rb = get_rootblock();
+  if (rb == NULL) {
+    return -1;
+  }
+  // index is out of bounds
+  if (index >= rb->num_inode_table_blocks * (rb->block_size / sizeof(inode_t)) || index < 0) {
+    free(rb);
+    return -1;
+  }
+  int offset = 1 + rb->num_free_bitmap_blocks;
+  fseek(fp, offset * rb->block_size + index * sizeof(inode_t), SEEK_SET);
+  if (fread(buffer, sizeof(_u32), 8, fp) < 0) {
+    return -1;
+  }
+  return 0;
+}
+
 /*Given a decimal number 0 <= b <= 255, calculate the 
 number of 1's if this number is converted to binary.*/
 int get_positive_bits(Byte b) {
@@ -426,5 +461,10 @@ int get_positive_bits(Byte b) {
 }
 
 int test() {
-
+  load("ReadingExample.disk", 0);
+  _u32 buffer[8];
+  read_inode(get_first_free_inode() - 1, buffer);
+  for (int i = 0; i < 8; i++) {
+    printf("buffer[i] = %d\n", buffer[i]);
+  }
 }
