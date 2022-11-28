@@ -378,9 +378,99 @@ int mkdir(char *name) {
 /* Opens a file for reading and writing. returns NULL on error. 
 filename is an absolute or relative path to a file.*/
 my_file *my_fopen(char *filename) {
+  rootblock_t * rb = get_rootblock();
+  if (rb == NULL) {
+    return NULL;
+  }
   // Read directory we want to create the file in
+  _u32 inode_buffer[8];
+  // for now hardcoding for root directory
+  if (read_inode(0, inode_buffer) < 0) {
+    free(rb);
+    return NULL;
+  }
+  inode_t inode;
+  inode.size = inode_buffer[0];
+  for (int i = 0; i < 7; i++) {
+    inode.blocks[i] = inode_buffer[i+1];
+  }
 
-  int index;
+  Byte rb_buffer[rb->block_size];
+  if (read_block(inode.blocks[0], rb_buffer) < 0) {
+    free(rb);
+    return NULL;
+  }
+
+  _u32 u32_buffer[1];
+
+  fseek(fp, inode.blocks[0] * rb->block_size, SEEK_SET);
+  if (fread(u32_buffer, sizeof(_u32), 1, fp) < 0) {
+    return NULL;
+  }
+
+  _u32 num_root_dir_entries[1];
+  num_root_dir_entries[0] = u32_buffer[0] + 1;
+  memcpy(rb_buffer, num_root_dir_entries, sizeof(_u32));
+
+  // _u32 inode_num;
+  // Byte type;
+  // Byte name_length;
+  // char *name;
+  direntry_t direntry;
+  direntry.inode_num = get_first_free_inode(); // index of the inode where the file data is stored 
+  direntry.type = 'F';
+  direntry.name_length = strlen(filename)+1; // +1 for null terminated string
+  direntry.name = filename;
+  _u32 buff[1];
+  buff[0] = direntry.inode_num;
+  fseek(fp, inode.blocks[0] * rb->block_size + inode.size, SEEK_SET);
+  if(fwrite(buff, sizeof(_u32) ,1,fp)<0){
+    return NULL;
+  }
+  buff[0]= direntry.type;
+  if(fwrite(buff, sizeof(Byte) ,1,fp)<0){
+    return NULL;
+  }
+  buff[0]=direntry.name_length;
+  if(fwrite(buff, sizeof(Byte) ,1,fp)<0){
+    return NULL;
+  }
+  
+  if(fwrite(direntry.name, strlen(filename)+1 ,1,fp)<0){
+    return NULL;
+  }
+
+  inode_buffer[0]+=6+strlen(filename)+1;
+  if(write_inode(0,inode_buffer)<0){
+    return NULL;
+  }
+  // inode creation for the file (file information for data blocks not root directory)
+//   typedef struct inode {
+//     _u32 size;
+//     _u32 blocks[7];
+// } inode_t;
+
+
+
+  // directory_t direntry;
+  // direntry.inode_num = get_first_free_inode();
+  // direntry.type = 'F';
+  // direntry.name_length = strlen(filename)+1;
+  // direntry.name = filename;
+
+  // _u32 direntry_inode_num_buffer[1]; // stores inode_num
+  // direntry_inode_num_buffer[0] = direntry.inode_num;
+
+  // int offset = inode.size;
+  // memcpy(rb_buffer + offset, direntry_inode_num_buffer, sizeof(_u32));
+
+  // Byte byte_buffer[2]; // stores type and name_length
+  // byte_buffer[0] = direntry.type;
+  // byte_buffer[1] = direntry.name_length;
+  // memcpy(result_buffer + current_offset, u32_buffer, sizeof(_u32));
+  // current_offset += sizeof(_u32);
+  
+
 
   // Create a new directory entry for the file we are creating
   // Set all attributes of the new direntry accoridingly
@@ -388,6 +478,11 @@ my_file *my_fopen(char *filename) {
   // Add new direntry to list of direntries of the directory
   // Write directory back to disk
   // Create my_file struct, set all attributes accordingly and return it
+}
+
+/*writes num bytes from file into buffer. Returns 0 on success.*/
+int my_fputc(my_file *file, Byte *buffer, _u32 num){
+  
 }
 
 
@@ -445,6 +540,26 @@ int read_inode(_u32 index, _u32 *buffer) {
   if (fread(buffer, sizeof(_u32), 8, fp) < 0) {
     return -1;
   }
+  free(rb);
+  return 0;
+}
+
+int write_inode(_u32 index, _u32 *buffer) {
+  rootblock_t * rb = get_rootblock();
+  if (rb == NULL) {
+    return -1;
+  }
+  // index is out of bounds
+  if (index >= rb->num_inode_table_blocks * (rb->block_size / sizeof(inode_t)) || index < 0) {
+    free(rb);
+    return -1;
+  }
+  int offset = 1 + rb->num_free_bitmap_blocks;
+  fseek(fp, offset * rb->block_size + index * sizeof(inode_t), SEEK_SET);
+  if (fwrite(buffer, sizeof(_u32), 8, fp) < 0) {
+    return -1;
+  }
+  free(rb);
   return 0;
 }
 
@@ -461,10 +576,6 @@ int get_positive_bits(Byte b) {
 }
 
 int test() {
-  load("ReadingExample.disk", 0);
-  _u32 buffer[8];
-  read_inode(get_first_free_inode() - 1, buffer);
-  for (int i = 0; i < 8; i++) {
-    printf("buffer[i] = %d\n", buffer[i]);
-  }
+  load("E3Sample.disk", 0);
+  my_file *file=my_fopen("hello_world");
 }
