@@ -210,7 +210,7 @@ int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes) {
     if (num_occupied_blocks % 8 != 0) {
       int result = 2;
       for (int k = 1; k <= num_occupied_blocks % 8; k++) {
-        result = k * result;
+        result *= k;
       }
       result -= 1;
       buffer[num_8_bit_blocks] = result;
@@ -361,20 +361,6 @@ int format(char *diskname, _u32 block_size, _u32 num_blocks, _u32 num_inodes) {
   return 0;
 }
 
-/* Makes a directory. name is either a full path (if it begins with '/', 
-or a relative path with regards to the current location in the file system. 
-All entries except the last must already exist. Returns 0 on success.*/
-int mkdir(char *name) {
-
-}
-
-// typedef struct my_file {
-//     _u32 inode_num;
-//     inode_t *inode;
-//     _u32 pos;
-//     Byte *buffer;
-//     char dirty;
-// } my_file;
 /* Opens a file for reading and writing. returns NULL on error. 
 filename is an absolute or relative path to a file.*/
 my_file *my_fopen(char *filename) {
@@ -382,9 +368,9 @@ my_file *my_fopen(char *filename) {
   if (rb == NULL) {
     return NULL;
   }
-  // Read directory we want to create the file in
+  // Read root directory inode
   _u32 inode_buffer[8];
-  // for now hardcoding for root directory
+  // hardcoding for root directory for now
   if (read_inode(0, inode_buffer) < 0) {
     free(rb);
     return NULL;
@@ -395,10 +381,35 @@ my_file *my_fopen(char *filename) {
     inode.blocks[i] = inode_buffer[i+1];
   }
 
-  Byte rb_buffer[rb->block_size];
-  if (read_block(inode.blocks[0], rb_buffer) < 0) {
+  Byte root_dir_buffer[rb->block_size];
+  if (read_block(inode.blocks[0], root_dir_buffer) < 0) {
     free(rb);
     return NULL;
+  }
+
+  char file_name[strlen(filename)+1];
+  for (int i = 0 ; i < strlen(filename)+1;i++){
+    file_name[i] = filename[i];
+  }
+  
+  printf("character at index 3: %c",file_name[3]);
+ int flag = 0;
+  for (int i = 0; i < rb->block_size; i++) {
+    if (root_dir_buffer[i] == 70) {
+        if (root_dir_buffer[i+1] == strlen(filename) + 1) {
+          int name_length = strlen(filename) + 1;
+          
+          int k = 0;
+          for (int j = i + 2; j < i + 2 + name_length; j++) {
+            if (root_dir_buffer[j] == file_name[k]){
+              k++;
+            }
+          }
+          if (k == name_length) {
+            // code here 
+          }
+        }
+    }
   }
 
   _u32 u32_buffer[1];
@@ -410,7 +421,10 @@ my_file *my_fopen(char *filename) {
 
   _u32 num_root_dir_entries[1];
   num_root_dir_entries[0] = u32_buffer[0] + 1;
-  memcpy(rb_buffer, num_root_dir_entries, sizeof(_u32));
+  fseek(fp, inode.blocks[0] * rb->block_size, SEEK_SET);
+  if (fwrite(num_root_dir_entries, sizeof(_u32), 1, fp) < 0) {
+    return NULL;
+  }
 
   // _u32 inode_num;
   // Byte type;
@@ -436,7 +450,7 @@ my_file *my_fopen(char *filename) {
     return NULL;
   }
   
-  if(fwrite(direntry.name, strlen(filename)+1 ,1,fp)<0){
+  if(fwrite(direntry.name, strlen(filename)+1 ,1,fp)<0) {
     return NULL;
   }
 
@@ -444,6 +458,23 @@ my_file *my_fopen(char *filename) {
   if(write_inode(0,inode_buffer)<0){
     return NULL;
   }
+  inode_t * new_inode = malloc(sizeof(inode_t));
+  new_inode->size = 0;
+  new_inode->blocks[0] = rb->num_blocks - num_free_blocks();
+  for (int i = 1; i<7;i++){
+    new_inode->blocks[i] = 0;
+  }
+  
+  my_file * file = malloc(sizeof(my_file));
+  //Byte data[rb->block_size];
+  
+  file->inode_num = direntry.inode_num;
+  file->inode = new_inode;
+  file->pos = 0;
+  //file->buffer = data;
+  file->dirty = 0;
+
+  return file;
   // inode creation for the file (file information for data blocks not root directory)
 //   typedef struct inode {
 //     _u32 size;
@@ -481,15 +512,59 @@ my_file *my_fopen(char *filename) {
 }
 
 /*writes num bytes from file into buffer. Returns 0 on success.*/
-int my_fputc(my_file *file, Byte *buffer, _u32 num){
-  
+int my_fputc(my_file *file, Byte *buffer, _u32 num) {
+  rootblock_t * rb = get_rootblock();
+  if (rb == NULL) {
+    return -1;
+  }
+  file->buffer = buffer;
+  file->inode->size += num;
+  write_inode(file->inode_num,file->inode);
+
+  fseek(fp,file->inode->blocks[0]*rb->block_size,SEEK_SET);
+  if(fwrite(buffer, sizeof(Byte),num,fp)<0){
+    return -1;
+  }
+
+  // For now only works for 1 block
+  int num_occupied_blocks = rb->num_blocks - num_free_blocks();
+  // Calculate the number of 8 positive-bit (FF) bytes
+  _u32 num_8_bit_blocks = 0;
+  for (int i = 7; i < num_occupied_blocks; i = i + 8) {
+    num_8_bit_blocks += 1;
+  }
+  Byte bitmap_buffer[rb->block_size];
+  // Write 8 positive-bit (FF) bytes
+  for (int i = 0; i < num_8_bit_blocks; i++) {
+    bitmap_buffer[i] = 255;
+  }
+  int remainder = num_occupied_blocks % 8;
+  if (remainder != 0) {
+    int result = 2;
+    for (int i = 1; i <= remainder + 1; i++) {
+      result += i;
+    }
+    result -= 1;
+    bitmap_buffer[num_8_bit_blocks] = result;
+  } else {
+    bitmap_buffer[num_8_bit_blocks] = 1;
+  }
+  for (int i = num_8_bit_blocks + 1; i < rb->block_size; i++) {
+    bitmap_buffer[i] = 0;
+  }
+  if (write_block(1, bitmap_buffer) < 0) {
+    return -1;
+  }
+
+  free(rb);
+  return 0;
 }
 
-
-// typedef struct inode {
-//     _u32 size;
-//     _u32 blocks[7];
-// } inode_t;
+/* closes the file and does any cleanup necessary. Returns 0 on success.*/
+int my_fclose(my_file *file) {
+  free(file);
+  return 0;
+}
 
 // Gets index of the first free inode or -1 on error.
 _u32 get_first_free_inode() {
@@ -516,7 +591,6 @@ _u32 get_first_free_inode() {
       if (flag == 1) {
         _u32 free_inode_index = (i - (1 + rb->num_free_bitmap_blocks)) * (rb->block_size / sizeof(inode_t)) + j;
         free(rb);
-        printf("free_inode_index is %d\n", free_inode_index);
         return free_inode_index;
       }
     }
@@ -578,4 +652,6 @@ int get_positive_bits(Byte b) {
 int test() {
   load("E3Sample.disk", 0);
   my_file *file=my_fopen("hello_world");
+  my_fputc(file,(Byte *) "hello",6);
+  my_fclose(file);
 }
