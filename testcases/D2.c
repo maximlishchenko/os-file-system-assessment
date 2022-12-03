@@ -10,17 +10,26 @@ int main()
     my_file *file=my_fopen("hello_world");
     my_fputc(file,(Byte *) "hello",6);
     my_fclose(file);
+    my_file *file2=my_fopen("hello_world2");
+    my_fputc(file2,(Byte *) "hello",6);
+    my_fclose(file2);
+    my_file *file3=my_fopen("hello_world3");
+    my_fputc(file3,(Byte *) "hello",6);
+    my_fclose(file3);
     unload();
     load("D2.disk",0);
-    printf("%d %d",num_free_blocks(),num_free_inodes());
-    if (num_free_inodes()!=78)
+    printf("%d %d\n",num_free_blocks(),num_free_inodes());
+    if (num_free_inodes()!=76)
         return -1;
-    if (num_free_blocks()!=4069)
+    if (num_free_blocks()!=4067)
         return -1;
 
     load("D2.disk",0);
     file=my_fopen("hello_world");
     Byte *buffer=malloc(6);
     my_fgetc(file,buffer,6);
+    if (strcmp((char *)buffer,"hello") == 0) {
+        printf("D2 PASS\n");
+    }
     return strcmp((char *)buffer,"hello");
 }

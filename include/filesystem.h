@@ -147,6 +147,8 @@ int get_positive_bits(Byte b);
 
 int read_inode(_u32 index, _u32 *buffer);
 
+int write_inode(_u32 index, _u32 *buffer);
+
 _u32 get_first_free_inode();
 
 #endif
