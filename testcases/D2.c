@@ -10,18 +10,25 @@ int main()
     my_file *file=my_fopen("hello_world");
     my_fputc(file,(Byte *) "hello",6);
     my_fclose(file);
+    unload();
+    load("D2.disk",0);
     my_file *file2=my_fopen("hello_world2");
     my_fputc(file2,(Byte *) "hello",6);
+    unload();
+    load("D2.disk",0);
     my_fclose(file2);
+    mkdir("testdir1");
+    mkdir("/testdir1");
     my_file *file3=my_fopen("hello_world3");
     my_fputc(file3,(Byte *) "hello",6);
     my_fclose(file3);
+    mkdir("/testdir2");
     unload();
     load("D2.disk",0);
     printf("%d %d\n",num_free_blocks(),num_free_inodes());
-    if (num_free_inodes()!=76)
+    if (num_free_inodes()!=74)
         return -1;
-    if (num_free_blocks()!=4067)
+    if (num_free_blocks()!=4065)
         return -1;
 
     load("D2.disk",0);

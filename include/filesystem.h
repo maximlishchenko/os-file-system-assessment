@@ -107,7 +107,7 @@ directory is not empty, return an error. Returns 0 on success.*/
 /* Sets the current working directory. name is either a full path 
 (if it begins with '/', or a relative path with regards to the current location 
 in the file system. All entries must already exist. Returns 0 on success.*/
-// int chdir(char *name);
+int chdir(char *name);
 /* Returns the full path to the current directory*/
 char *cwd(void);
 /* Returns a sorted list of directory entries as a string separated by \n*/
@@ -150,5 +150,7 @@ int read_inode(_u32 index, _u32 *buffer);
 int write_inode(_u32 index, _u32 *buffer);
 
 _u32 get_first_free_inode();
+
+int update_bitmap(_u32 num);
 
 #endif
